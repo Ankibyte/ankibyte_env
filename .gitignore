@@ -1,0 +1,13 @@
+# Environment variables
+# Logs
+logs/
+*.log
+
+# Docker volumes
+data/
+postgres_data/
+
+# System files
+.DS_Store
+.idea/
+.vscode/
