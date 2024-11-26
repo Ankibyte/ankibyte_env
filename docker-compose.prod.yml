@@ -1,0 +1,13 @@
+# docker-compose.prod.yml
+services:
+  backend:
+    command: gunicorn ankibyte.wsgi:application --bind 0.0.0.0:8000 --workers 4
+    environment:
+      - DEBUG=False
+      - DJANGO_SETTINGS_MODULE=ankibyte.settings.production
+
+  frontend:
+    command: nginx -g 'daemon off;'
+    environment:
+      - NODE_ENV=production
+      - REACT_APP_API_URL=https://your-domain.com

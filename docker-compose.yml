@@ -1,0 +1,114 @@
+services:
+  db:
+    image: postgres:14
+    environment:
+      - POSTGRES_DB=ankibyte_dev
+      - POSTGRES_USER=ankibyte_user
+      - POSTGRES_PASSWORD=ankibyte_password_dev
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ankibyte_user -d ankibyte_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7
+    ports:
+      - "6380:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build: 
+      context: ../backend
+      dockerfile: Dockerfile
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - ../backend:/app
+      - backend_media:/app/media:rw  
+      - backend_static:/app/static
+    environment:
+      - DEBUG=1
+      - DJANGO_SETTINGS_MODULE=ankibyte.settings.development
+      - POSTGRES_DB=ankibyte_dev
+      - POSTGRES_USER=ankibyte_user
+      - POSTGRES_PASSWORD=ankibyte_password_dev
+      - DB_HOST=db
+      - DB_PORT=5432
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    ports:
+      - "8000:8000"
+
+  celery:
+    build: 
+      context: ../backend
+      dockerfile: Dockerfile
+    command: celery -A ankibyte worker -l INFO -Q default,processing,maintenance -c 2
+    volumes:
+      - ../backend:/app
+      - backend_media:/app/media
+      - backend_static:/app/static
+    environment:
+      - DEBUG=1
+      - DJANGO_SETTINGS_MODULE=ankibyte.settings.development
+      - POSTGRES_DB=ankibyte_dev
+      - POSTGRES_USER=ankibyte_user
+      - POSTGRES_PASSWORD=ankibyte_password_dev
+      - DB_HOST=db
+      - DB_PORT=5432
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    depends_on:
+      - backend
+
+  celery-beat:
+    build: 
+      context: ../backend
+      dockerfile: Dockerfile
+    command: celery -A ankibyte beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    volumes:
+      - ../backend:/app
+    environment:
+      - DEBUG=1
+      - DJANGO_SETTINGS_MODULE=ankibyte.settings.development
+      - REDIS_URL=redis://redis:6379/0
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    depends_on:
+      - backend
+      - celery
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - REACT_APP_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+  backend_media:
+  backend_static:

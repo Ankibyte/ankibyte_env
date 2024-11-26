@@ -1,0 +1,12 @@
+# docker-compose.dev.yml
+services:
+  backend:
+    environment:
+      - DEBUG=1
+      - DJANGO_SETTINGS_MODULE=ankibyte.settings.development
+
+  frontend:
+    environment:
+      - NODE_ENV=development
+      - REACT_APP_API_URL=http://localhost:8000
+
